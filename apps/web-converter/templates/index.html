@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ממיר ל-Markdown</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.9/purify.min.js"></script>
+<style>
+:root {
+  --bg: #f6f7f9; --card: #fff; --text: #1d2330; --muted: #667085;
+  --border: #dde1e8; --accent: #2f6fed; --accent-soft: #e8f0ff; --err: #c0362c;
+  --code: #f2f4f7;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151b; --card: #1b1f27; --text: #e6e9ef; --muted: #98a2b3;
+    --border: #2c3340; --accent: #6c9bff; --accent-soft: #1f2b45; --err: #ff7b72;
+    --code: #232935;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.6 system-ui, "Segoe UI", Arial, sans-serif; }
+main { max-width: 1000px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { margin: 0 0 4px; font-size: 26px; }
+.sub { color: var(--muted); margin: 0 0 24px; }
+.drop { border: 2px dashed var(--border); border-radius: 14px; background: var(--card);
+  padding: 40px 16px; text-align: center; cursor: pointer; transition: .15s; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop strong { display: block; font-size: 18px; margin-bottom: 6px; }
+.drop span { color: var(--muted); font-size: 13px; }
+.row { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+input[type=url] { flex: 1; min-width: 220px; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--card); color: var(--text); font: inherit; }
+button { padding: 9px 16px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--card); color: var(--text); font: inherit; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .5; cursor: default; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; margin: 24px 0 8px; }
+.status { color: var(--muted); }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  margin-bottom: 16px; overflow: hidden; }
+.card header { display: flex; gap: 8px; align-items: center; padding: 10px 14px;
+  border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.card header .name { font-weight: 600; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.card header button { padding: 5px 10px; font-size: 13px; }
+.tabs button.active { background: var(--accent-soft); border-color: var(--accent); }
+.card .err { color: var(--err); padding: 14px; }
+pre.raw { margin: 0; padding: 14px; max-height: 480px; overflow: auto; white-space: pre-wrap;
+  overflow-wrap: anywhere; background: var(--code); font: 13px/1.5 Consolas, monospace; }
+.rendered { padding: 4px 20px; max-height: 480px; overflow: auto; }
+.rendered table { border-collapse: collapse; }
+.rendered th, .rendered td { border: 1px solid var(--border); padding: 4px 8px; }
+.rendered img { max-width: 100%; }
+.rendered pre, .rendered code { background: var(--code); }
+</style>
+</head>
+<body>
+<main>
+  <h1>ממיר קבצים ל-Markdown</h1>
+  <p class="sub">PDF, Word, PowerPoint, Excel, HTML, CSV, JSON, EPUB, ZIP ועוד — מבוסס MarkItDown, רץ מקומית במחשב שלך.</p>
+
+  <div class="drop" id="drop">
+    <strong>גרור לכאן קבצים</strong>
+    <span>או לחץ כדי לבחור (אפשר כמה קבצים יחד)</span>
+    <input type="file" id="file" multiple hidden>
+  </div>
+
+  <form class="row" id="urlForm">
+    <input type="url" id="url" placeholder="או הדבק כתובת אתר / YouTube / ויקיפדיה" dir="ltr">
+    <button class="primary" type="submit">המר כתובת</button>
+  </form>
+
+  <div class="toolbar">
+    <span class="status" id="status"></span>
+    <span>
+      <button id="zipAll" disabled>הורד הכול (ZIP)</button>
+      <button id="clear" disabled>נקה</button>
+    </span>
+  </div>
+
+  <section id="results"></section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const results = [];
+const drop = $("#drop"), fileInput = $("#file"), status = $("#status");
+
+drop.onclick = () => fileInput.click();
+fileInput.onchange = () => { upload(fileInput.files); fileInput.value = ""; };
+["dragenter", "dragover"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", ev => upload(ev.dataTransfer.files));
+
+$("#urlForm").onsubmit = async ev => {
+  ev.preventDefault();
+  const url = $("#url").value.trim();
+  if (!url) return;
+  await run(() => fetch("/api/convert-url", {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({url})
+  }), "ממיר כתובת…");
+  $("#url").value = "";
+};
+
+async function upload(files) {
+  if (!files || !files.length) return;
+  const fd = new FormData();
+  for (const f of files) fd.append("files", f);
+  await run(() => fetch("/api/convert", {method: "POST", body: fd}), `ממיר ${files.length} קבצים…`);
+}
+
+async function run(req, msg) {
+  status.textContent = msg;
+  try {
+    const res = await req();
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    data.results.forEach(r => { results.push(r); render(r); });
+    const ok = data.results.filter(r => !r.error).length;
+    status.textContent = `הומרו ${ok} מתוך ${data.results.length}`;
+  } catch (e) {
+    status.textContent = "שגיאה: " + e.message;
+  }
+  refreshButtons();
+}
+
+function refreshButtons() {
+  $("#zipAll").disabled = !results.some(r => !r.error);
+  $("#clear").disabled = !results.length;
+}
+
+function render(r) {
+  const card = document.createElement("article");
+  card.className = "card";
+  const header = document.createElement("header");
+  const name = document.createElement("span");
+  name.className = "name";
+  name.textContent = r.error ? r.source : `${r.source} ← ${r.name}`;
+  header.append(name);
+  card.append(header);
+
+  if (r.error) {
+    const e = document.createElement("div");
+    e.className = "err"; e.textContent = r.error;
+    card.append(e);
+  } else {
+    const raw = document.createElement("pre");
+    raw.className = "raw"; raw.dir = "auto"; raw.textContent = r.markdown;
+    const view = document.createElement("div");
+    view.className = "rendered"; view.dir = "auto"; view.hidden = true;
+    view.innerHTML = DOMPurify.sanitize(marked.parse(r.markdown));
+
+    const tabs = document.createElement("span");
+    tabs.className = "tabs";
+    const bRaw = btn("Markdown", () => { raw.hidden = false; view.hidden = true; bRaw.classList.add("active"); bView.classList.remove("active"); });
+    const bView = btn("תצוגה", () => { raw.hidden = true; view.hidden = false; bView.classList.add("active"); bRaw.classList.remove("active"); });
+    bRaw.classList.add("active");
+    tabs.append(bRaw, " ", bView);
+
+    const copy = btn("העתק", async () => {
+      await navigator.clipboard.writeText(r.markdown);
+      copy.textContent = "הועתק ✓"; setTimeout(() => copy.textContent = "העתק", 1500);
+    });
+    const dl = btn("הורד .md", () => download(new Blob([r.markdown], {type: "text/markdown;charset=utf-8"}), r.name));
+    header.append(tabs, copy, dl);
+    card.append(raw, view);
+  }
+  $("#results").prepend(card);
+}
+
+function btn(label, onClick) {
+  const b = document.createElement("button");
+  b.type = "button"; b.textContent = label; b.onclick = onClick;
+  return b;
+}
+
+function download(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+$("#zipAll").onclick = async () => {
+  const items = results.filter(r => !r.error).map(r => ({name: r.name, markdown: r.markdown}));
+  const res = await fetch("/api/zip", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({items})});
+  download(await res.blob(), "markdown.zip");
+};
+
+$("#clear").onclick = () => {
+  results.length = 0; $("#results").innerHTML = ""; status.textContent = ""; refreshButtons();
+};
+</script>
+</body>
+</html>
