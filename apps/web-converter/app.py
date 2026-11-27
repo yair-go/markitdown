@@ -3,8 +3,10 @@
 Run:  uv run app.py   then open http://127.0.0.1:5000
 """
 
+import html
 import io
 import os
+import threading
 import zipfile
 from pathlib import Path
 from urllib.parse import urlparse
@@ -102,6 +104,55 @@ def make_zip():
         mimetype="application/zip",
         as_attachment=True,
         download_name="markdown.zip",
+    )
+
+
+PDF_CSS = """
+@page { size: A4; margin: 18mm 16mm; }
+body { font-family: "Segoe UI", Arial, "David", sans-serif; font-size: 11pt;
+  line-height: 1.6; color: #111; }
+h1, h2, h3 { line-height: 1.3; page-break-after: avoid; }
+table { border-collapse: collapse; margin: 8px 0; }
+th, td { border: 1px solid #999; padding: 4px 8px; vertical-align: top; }
+th { background: #f0f0f0; }
+tr, img, pre { page-break-inside: avoid; }
+img { max-width: 100%; }
+pre, code { font-family: Consolas, monospace; font-size: 9.5pt; background: #f4f4f4; }
+pre { padding: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+blockquote { margin: 0; padding: 0 12px; border-inline-start: 3px solid #ccc; color: #444; }
+"""
+
+# Playwright's sync API isn't thread-safe; Flask serves requests on threads.
+_pdf_lock = threading.Lock()
+
+
+@app.post("/api/pdf")
+def make_pdf():
+    """Render the preview HTML (already sanitized in the browser) to a PDF."""
+    from playwright.sync_api import sync_playwright
+
+    payload = request.get_json(silent=True) or {}
+    body = payload.get("html", "")
+    title = html.escape(payload.get("title") or "document")
+    direction = "rtl" if payload.get("dir") == "rtl" else "ltr"
+    doc = (
+        f'<!doctype html><html dir="{direction}"><head><meta charset="utf-8">'
+        f"<title>{title}</title><style>{PDF_CSS}</style></head>"
+        f"<body>{body}</body></html>"
+    )
+    with _pdf_lock, sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_context(java_script_enabled=False).new_page()
+            page.set_content(doc, wait_until="load")
+            pdf = page.pdf(format="A4", print_background=True, prefer_css_page_size=True)
+        finally:
+            browser.close()
+    return send_file(
+        io.BytesIO(pdf),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"{Path(payload.get('name') or 'document').stem}.pdf",
     )
 
 

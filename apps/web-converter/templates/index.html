@@ -219,7 +219,14 @@ function render(r) {
     view.className = "rendered"; view.dir = "auto";
     body.append(raw, view);
 
-    const renderView = () => { view.innerHTML = DOMPurify.sanitize(marked.parse(r.markdown)); };
+    const renderView = () => {
+      view.innerHTML = DOMPurify.sanitize(marked.parse(r.markdown));
+      // Explicit per-block direction (from the first strong letter) so Hebrew and English
+      // paragraphs, tables and lists each lay out correctly, in the preview and in the PDF.
+      view.dir = textDir(view.textContent);
+      view.querySelectorAll("p,h1,h2,h3,h4,h5,h6,li,ul,ol,table,th,td,blockquote")
+        .forEach(el => { const d = textDir(el.textContent, null); if (d) el.dir = d; });  // no letters: inherit
+    };
     let timer;
     raw.addEventListener("input", () => {
       r.markdown = raw.value;
@@ -263,10 +270,29 @@ function render(r) {
     save.hidden = !folderSupported;
     r.badge = document.createElement("span");
     r.badge.className = "saved";
-    header.append(tabs, edited, revert, copy, dl, save, r.badge);
+    const pdf = btn("הורד PDF", async () => {
+      renderView();  // make sure the preview reflects the latest edits
+      pdf.disabled = true; pdf.textContent = "יוצר PDF…";
+      try {
+        const res = await fetch("/api/pdf", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({name: r.name, title: r.title || r.name, html: view.innerHTML, dir: view.dir}),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        download(await res.blob(), r.name.replace(/\.md$/i, "") + ".pdf");
+      } catch (e) { status.textContent = "שגיאה ביצירת PDF: " + e.message; }
+      finally { pdf.disabled = false; pdf.textContent = "הורד PDF"; }
+    });
+    header.append(tabs, edited, revert, copy, dl, pdf, save, r.badge);
     card.append(body);
   }
   $("#results").prepend(card);
+}
+
+// "rtl" if the first strong letter is Hebrew/Arabic, "ltr" if Latin etc., else the fallback.
+function textDir(text, fallback = "ltr") {
+  const m = /[֐-ࣿיִ-﷿ﹰ-﻿]|[A-Za-zÀ-ɏͰ-ϿЀ-ӿ]/.exec(text);
+  return m ? (/[A-Za-zÀ-ӿ]/.test(m[0]) ? "ltr" : "rtl") : fallback;
 }
 
 function btn(label, onClick) {
