@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ממיר ל-Markdown</title>
+<script>
+  // Apply the saved theme before first paint to avoid a flash.
+  try {
+    const t = localStorage.getItem("theme");
+    if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  } catch (e) {}
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.9/purify.min.js"></script>
 <style>
@@ -13,12 +20,25 @@
   --code: #f2f4f7;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #12151b; --card: #1b1f27; --text: #e6e9ef; --muted: #98a2b3;
     --border: #2c3340; --accent: #6c9bff; --accent-soft: #1f2b45; --err: #ff7b72;
     --code: #232935;
   }
 }
+:root[data-theme="dark"] {
+  --bg: #12151b; --card: #1b1f27; --text: #e6e9ef; --muted: #98a2b3;
+  --border: #2c3340; --accent: #6c9bff; --accent-soft: #1f2b45; --err: #ff7b72;
+  --code: #232935;
+}
+:root { color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.theme { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.theme button { border: 0; border-radius: 0; padding: 6px 12px; font-size: 13px; }
+.theme button + button { border-inline-start: 1px solid var(--border); }
+.theme button[aria-pressed="true"] { background: var(--accent); color: #fff; }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text);
   font: 15px/1.6 system-ui, "Segoe UI", Arial, sans-serif; }
@@ -58,7 +78,14 @@ pre.raw { margin: 0; padding: 14px; max-height: 480px; overflow: auto; white-spa
 </head>
 <body>
 <main>
-  <h1>ממיר קבצים ל-Markdown</h1>
+  <div class="top">
+    <h1>ממיר קבצים ל-Markdown</h1>
+    <div class="theme" role="group" aria-label="ערכת נושא">
+      <button type="button" data-theme-choice="auto">אוטומטי</button>
+      <button type="button" data-theme-choice="light">בהיר</button>
+      <button type="button" data-theme-choice="dark">כהה</button>
+    </div>
+  </div>
   <p class="sub">PDF, Word, PowerPoint, Excel, HTML, CSV, JSON, EPUB, ZIP ועוד — מבוסס MarkItDown, רץ מקומית במחשב שלך.</p>
 
   <div class="drop" id="drop">
@@ -87,6 +114,17 @@ pre.raw { margin: 0; padding: 14px; max-height: 480px; overflow: auto; white-spa
 const $ = s => document.querySelector(s);
 const results = [];
 const drop = $("#drop"), fileInput = $("#file"), status = $("#status");
+
+// Theme switcher: auto (follow system) / light / dark, remembered per browser.
+const themeButtons = document.querySelectorAll("[data-theme-choice]");
+function setTheme(choice) {
+  if (choice === "auto") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = choice;
+  themeButtons.forEach(b => b.setAttribute("aria-pressed", b.dataset.themeChoice === choice));
+  try { choice === "auto" ? localStorage.removeItem("theme") : localStorage.setItem("theme", choice); } catch (e) {}
+}
+themeButtons.forEach(b => b.onclick = () => setTheme(b.dataset.themeChoice));
+setTheme(document.documentElement.dataset.theme || "auto");
 
 drop.onclick = () => fileInput.click();
 fileInput.onchange = () => { upload(fileInput.files); fileInput.value = ""; };
