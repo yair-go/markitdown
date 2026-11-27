@@ -2,5 +2,7 @@
 # Requires uv (https://docs.astral.sh/uv/). uv creates/updates .venv from uv.lock on first run.
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $here
+# Headless Chromium for PDF export (no-op when already installed).
+uv run playwright install chromium
 Start-Process "http://127.0.0.1:5000"
 uv run app.py
