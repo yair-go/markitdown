@@ -891,14 +891,14 @@ wheels = [
 
 [[package]]
 name = "mammoth"
-version = "1.11.0"
+version = "1.13.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cobble" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ed/3c/a58418d2af00f2da60d4a51e18cd0311307b72d48d2fffec36a97b4a5e44/mammoth-1.11.0.tar.gz", hash = "sha256:a0f59e442f34d5b6447f4b0999306cbf3e67aaabfa8cb516f878fb1456744637", size = 53142, upload-time = "2025-09-19T10:35:20.373Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c3/a8/d6691d0b76cf55cf19851e9e189d0356526024d650c131a0969fcd76225d/mammoth-1.13.0.tar.gz", hash = "sha256:b359bee7bc00caba47dacc64286928133dd947917bab852eea01d0c8d8997296", size = 53987, upload-time = "2026-09-26T22:12:09.733Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ca/54/2e39566a131b13f6d8d193f974cb6a34e81bb7cc2fa6f7e03de067b36588/mammoth-1.11.0-py2.py3-none-any.whl", hash = "sha256:c077ab0d450bd7c0c6ecd529a23bf7e0fa8190c929e28998308ff4eada3f063b", size = 54752, upload-time = "2025-09-19T10:35:18.699Z" },
+    { url = "https://files.pythonhosted.org/packages/af/2a/47d72b27689f3c7cd1d270dd1d4699df2fe3b78b2f293b6b08f565548a45/mammoth-1.13.0-py2.py3-none-any.whl", hash = "sha256:dd7629fa9d0a5e82207b3f481a9dcb8308fb43f6206258e062f11121efba9991", size = 55228, upload-time = "2026-09-26T22:12:08.265Z" },
 ]
 
 [[package]]
@@ -918,6 +918,7 @@ name = "markitdown"
 source = { editable = "../../packages/markitdown" }
 dependencies = [
     { name = "beautifulsoup4" },
+    { name = "certifi" },
     { name = "charset-normalizer" },
     { name = "defusedxml" },
     { name = "magika" },
@@ -956,13 +957,14 @@ requires-dist = [
     { name = "azure-identity", marker = "extra == 'az-content-understanding'" },
     { name = "azure-identity", marker = "extra == 'az-doc-intel'" },
     { name = "beautifulsoup4" },
+    { name = "certifi", specifier = ">=2026.10.19" },
     { name = "charset-normalizer" },
     { name = "defusedxml" },
     { name = "lxml", marker = "extra == 'all'" },
     { name = "lxml", marker = "extra == 'docx'" },
-    { name = "magika", specifier = "~=0.6.1" },
-    { name = "mammoth", marker = "extra == 'all'", specifier = "~=1.11.0" },
-    { name = "mammoth", marker = "extra == 'docx'", specifier = "~=1.11.0" },
+    { name = "magika", specifier = ">=0.6.1,<2" },
+    { name = "mammoth", marker = "extra == 'all'", specifier = ">=1.12.2,<2" },
+    { name = "mammoth", marker = "extra == 'docx'", specifier = ">=1.12.2,<2" },
     { name = "markdownify" },
     { name = "olefile", marker = "extra == 'all'" },
     { name = "olefile", marker = "extra == 'outlook'" },
@@ -980,12 +982,12 @@ requires-dist = [
     { name = "python-pptx", marker = "extra == 'all'" },
     { name = "python-pptx", marker = "extra == 'pptx'" },
     { name = "requests" },
-    { name = "speechrecognition", marker = "extra == 'all'" },
-    { name = "speechrecognition", marker = "extra == 'audio-transcription'" },
+    { name = "speechrecognition", marker = "extra == 'all'", specifier = ">=3.10.4" },
+    { name = "speechrecognition", marker = "extra == 'audio-transcription'", specifier = ">=3.10.4" },
     { name = "xlrd", marker = "extra == 'all'" },
     { name = "xlrd", marker = "extra == 'xls'" },
-    { name = "youtube-transcript-api", marker = "extra == 'all'", specifier = "~=1.0.0" },
-    { name = "youtube-transcript-api", marker = "extra == 'youtube-transcription'" },
+    { name = "youtube-transcript-api", marker = "extra == 'all'", specifier = "~=1.2.3" },
+    { name = "youtube-transcript-api", marker = "extra == 'youtube-transcription'", specifier = "~=1.2.3" },
 ]
 provides-extras = ["all", "audio-transcription", "az-content-understanding", "az-doc-intel", "docx", "outlook", "pdf", "pptx", "xls", "xlsx", "youtube-transcription"]
 
@@ -2262,13 +2264,13 @@ wheels = [
 
 [[package]]
 name = "youtube-transcript-api"
-version = "1.0.3"
+version = "1.2.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "defusedxml" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b0/32/f60d87a99c05a53604c58f20f670c7ea6262b55e0bbeb836ffe4550b248b/youtube_transcript_api-1.0.3.tar.gz", hash = "sha256:902baf90e7840a42e1e148335e09fe5575dbff64c81414957aea7038e8a4db46", size = 2153252, upload-time = "2025-03-25T18:14:21.119Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/4d/e5ab63c432a4a818ec5ca9eb18584472653bbdd845cc46bf9d227bad6c4d/youtube_transcript_api-1.2.5.tar.gz", hash = "sha256:5e750bd1bac188c1b4afeaf20464ba4dd7a5fb05617f48463f9faa5bace683cc", size = 470631, upload-time = "2026-11-05T11:23:21.571Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f0/44/40c03bb0f8bddfb9d2beff2ed31641f52d96c287ba881d20e0c074784ac2/youtube_transcript_api-1.0.3-py3-none-any.whl", hash = "sha256:d1874e57de65cf14c9d7d09b2b37c814d6287fa0e770d4922c4cd32a5b3f6c47", size = 2169911, upload-time = "2025-03-25T18:14:19.416Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/ee/6463d3dafe3bf671af6b8c149cd746d4a48f43eb23de4b906f8e010b796f/youtube_transcript_api-1.2.5-py3-none-any.whl", hash = "sha256:e79323bcb2daebed25773fef51a8dd10fee2ff39fb5993dccbe060470d6721ea", size = 485658, upload-time = "2026-11-05T11:23:20.365Z" },
 ]
