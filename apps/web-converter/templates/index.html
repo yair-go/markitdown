@@ -73,9 +73,16 @@ button:disabled { opacity: .5; cursor: default; }
 .card header button { padding: 5px 10px; font-size: 13px; }
 .tabs button.active { background: var(--accent-soft); border-color: var(--accent); }
 .card .err { color: var(--err); padding: 14px; }
-pre.raw { margin: 0; padding: 14px; max-height: 480px; overflow: auto; white-space: pre-wrap;
-  overflow-wrap: anywhere; background: var(--code); font: 13px/1.5 Consolas, monospace; }
-.rendered { padding: 4px 20px; max-height: 480px; overflow: auto; }
+.body { display: grid; }
+.body.split { grid-template-columns: 1fr 1fr; }
+.body.split > .rendered { border-inline-start: 1px solid var(--border); }
+@media (max-width: 700px) { .body.split { grid-template-columns: 1fr; } .body.split > .rendered { border-inline-start: 0; border-top: 1px solid var(--border); } }
+textarea.raw { display: block; width: 100%; height: 480px; min-height: 160px; margin: 0; padding: 14px; border: 0;
+  resize: vertical; background: var(--code); color: var(--text); font: 13px/1.5 Consolas, monospace; }
+textarea.raw:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+textarea.raw[hidden], .rendered[hidden] { display: none; }
+.rendered { padding: 4px 20px; height: 480px; overflow: auto; min-width: 0; }
+.edited { font-size: 12px; color: var(--accent); font-weight: 600; }
 .rendered table { border-collapse: collapse; }
 .rendered th, .rendered td { border: 1px solid var(--border); padding: 4px 8px; }
 .rendered img { max-width: 100%; }
@@ -202,18 +209,47 @@ function render(r) {
     e.className = "err"; e.textContent = r.error;
     card.append(e);
   } else {
-    const raw = document.createElement("pre");
-    raw.className = "raw"; raw.dir = "auto"; raw.textContent = r.markdown;
+    r.original = r.markdown;
+    const body = document.createElement("div");
+    body.className = "body";
+    const raw = document.createElement("textarea");
+    raw.className = "raw"; raw.dir = "auto"; raw.spellcheck = false; raw.value = r.markdown;
+    raw.setAttribute("aria-label", "עריכת Markdown");
     const view = document.createElement("div");
-    view.className = "rendered"; view.dir = "auto"; view.hidden = true;
-    view.innerHTML = DOMPurify.sanitize(marked.parse(r.markdown));
+    view.className = "rendered"; view.dir = "auto";
+    body.append(raw, view);
 
+    const renderView = () => { view.innerHTML = DOMPurify.sanitize(marked.parse(r.markdown)); };
+    let timer;
+    raw.addEventListener("input", () => {
+      r.markdown = raw.value;
+      setEdited(r.markdown !== r.original);
+      if (!view.hidden) { clearTimeout(timer); timer = setTimeout(renderView, 150); }
+    });
+
+    // Views: Markdown editor / rendered preview / side by side.
     const tabs = document.createElement("span");
     tabs.className = "tabs";
-    const bRaw = btn("Markdown", () => { raw.hidden = false; view.hidden = true; bRaw.classList.add("active"); bView.classList.remove("active"); });
-    const bView = btn("תצוגה", () => { raw.hidden = true; view.hidden = false; bView.classList.add("active"); bRaw.classList.remove("active"); });
-    bRaw.classList.add("active");
-    tabs.append(bRaw, " ", bView);
+    const modes = {edit: "עריכה", view: "תצוגה", split: "מפוצל"};
+    const tabBtns = {};
+    const setMode = m => {
+      raw.hidden = m === "view";
+      view.hidden = m === "edit";
+      body.classList.toggle("split", m === "split");
+      if (!view.hidden) renderView();
+      Object.entries(tabBtns).forEach(([k, b]) => b.classList.toggle("active", k === m));
+    };
+    Object.entries(modes).forEach(([k, label]) => { tabBtns[k] = btn(label, () => setMode(k)); tabs.append(tabBtns[k], " "); });
+    setMode("edit");
+
+    const edited = document.createElement("span");
+    edited.className = "edited"; edited.textContent = "נערך"; edited.hidden = true;
+    const revert = btn("בטל שינויים", () => {
+      if (!confirm("לחזור לתוצאת ההמרה המקורית? השינויים שלך יימחקו.")) return;
+      raw.value = r.markdown = r.original; setEdited(false); if (!view.hidden) renderView();
+    });
+    revert.hidden = true;
+    function setEdited(on) { edited.hidden = revert.hidden = !on; }
 
     const copy = btn("העתק", async () => {
       await navigator.clipboard.writeText(r.markdown);
@@ -227,8 +263,8 @@ function render(r) {
     save.hidden = !folderSupported;
     r.badge = document.createElement("span");
     r.badge.className = "saved";
-    header.append(tabs, copy, dl, save, r.badge);
-    card.append(raw, view);
+    header.append(tabs, edited, revert, copy, dl, save, r.badge);
+    card.append(body);
   }
   $("#results").prepend(card);
 }
@@ -278,19 +314,21 @@ async function exists(name) {
   try { await dirHandle.getFileHandle(name); return true; } catch { return false; }
 }
 
-// Writes each result as <name>.md, adding " (1)", " (2)"... instead of overwriting.
+// Writes each result as <name>.md, adding " (1)", " (2)"... instead of overwriting
+// other files. A result already saved to this folder overwrites its own file (e.g. after edits).
 async function saveToFolder(items) {
   if (!(await ensureFolder())) return 0;
   let n = 0;
   for (const r of items) {
     const stem = r.name.replace(/\.md$/i, "");
     let name = r.name, i = 1;
-    while (await exists(name)) name = `${stem} (${i++}).md`;
+    if (r.savedAs && r.savedDir === dirHandle) name = r.savedAs;
+    else while (await exists(name)) name = `${stem} (${i++}).md`;
     const fh = await dirHandle.getFileHandle(name, {create: true});
     const w = await fh.createWritable();
     await w.write(r.markdown);
     await w.close();
-    r.savedAs = name;
+    r.savedAs = name; r.savedDir = dirHandle;
     if (r.badge) r.badge.textContent = `נשמר כ-${name}`;
     n++;
   }
