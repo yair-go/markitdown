@@ -1,6 +1,6 @@
 """Local web app for converting files to Markdown with MarkItDown.
 
-Run:  .venv\\Scripts\\python app.py   then open http://127.0.0.1:5000
+Run:  uv run app.py   then open http://127.0.0.1:5000
 """
 
 import io

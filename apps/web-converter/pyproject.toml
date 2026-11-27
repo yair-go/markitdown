@@ -1,0 +1,16 @@
+[project]
+name = "web-converter"
+version = "0.1.0"
+description = "Local web app for converting files to Markdown with MarkItDown"
+requires-python = ">=3.10"
+dependencies = [
+    "flask",
+    "markitdown[all]",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+# Use the MarkItDown package from this repository (editable).
+markitdown = { path = "../../packages/markitdown", editable = true }

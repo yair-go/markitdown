@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "md-converter",
-      "runtimeExecutable": "apps/web-converter/.venv/Scripts/python.exe",
-      "runtimeArgs": ["apps/web-converter/app.py"],
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "--project", "apps/web-converter", "apps/web-converter/app.py"],
       "port": 5000
     }
   ]
