@@ -57,6 +57,12 @@ button { padding: 9px 16px; border-radius: 10px; border: 1px solid var(--border)
   background: var(--card); color: var(--text); font: inherit; cursor: pointer; }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 button:disabled { opacity: .5; cursor: default; }
+.folder { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--card);
+  border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; }
+.folder .path { font-weight: 600; overflow-wrap: anywhere; }
+.folder .hint { color: var(--muted); font-size: 13px; }
+.folder label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.saved { color: var(--muted); font-size: 12px; }
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin: 24px 0 8px; }
 .status { color: var(--muted); }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px;
@@ -99,9 +105,16 @@ pre.raw { margin: 0; padding: 14px; max-height: 480px; overflow: auto; white-spa
     <button class="primary" type="submit">המר כתובת</button>
   </form>
 
+  <div class="folder" id="folderBox">
+    <button type="button" id="pickFolder">בחר תיקייה לשמירה</button>
+    <span class="hint" id="folderName">לא נבחרה תיקייה</span>
+    <label><input type="checkbox" id="autoSave" disabled> שמור אוטומטית כל המרה לתיקייה</label>
+  </div>
+
   <div class="toolbar">
     <span class="status" id="status"></span>
     <span>
+      <button id="saveAll" disabled>שמור הכול לתיקייה</button>
       <button id="zipAll" disabled>הורד הכול (ZIP)</button>
       <button id="clear" disabled>נקה</button>
     </span>
@@ -158,6 +171,10 @@ async function run(req, msg) {
     data.results.forEach(r => { results.push(r); render(r); });
     const ok = data.results.filter(r => !r.error).length;
     status.textContent = `הומרו ${ok} מתוך ${data.results.length}`;
+    if (dirHandle && $("#autoSave").checked && ok) {
+      const n = await saveToFolder(data.results.filter(r => !r.error));
+      status.textContent += ` · נשמרו ${n} לתיקייה ${dirHandle.name}`;
+    }
   } catch (e) {
     status.textContent = "שגיאה: " + e.message;
   }
@@ -166,6 +183,7 @@ async function run(req, msg) {
 
 function refreshButtons() {
   $("#zipAll").disabled = !results.some(r => !r.error);
+  $("#saveAll").disabled = !results.some(r => !r.error);
   $("#clear").disabled = !results.length;
 }
 
@@ -202,7 +220,14 @@ function render(r) {
       copy.textContent = "הועתק ✓"; setTimeout(() => copy.textContent = "העתק", 1500);
     });
     const dl = btn("הורד .md", () => download(new Blob([r.markdown], {type: "text/markdown;charset=utf-8"}), r.name));
-    header.append(tabs, copy, dl);
+    const save = btn("שמור לתיקייה", async () => {
+      try { if (await saveToFolder([r])) status.textContent = `נשמר: ${r.savedAs}`; }
+      catch (e) { status.textContent = "שגיאה בשמירה: " + e.message; }
+    });
+    save.hidden = !folderSupported;
+    r.badge = document.createElement("span");
+    r.badge.className = "saved";
+    header.append(tabs, copy, dl, save, r.badge);
     card.append(raw, view);
   }
   $("#results").prepend(card);
@@ -219,6 +244,65 @@ function download(blob, name) {
   a.href = URL.createObjectURL(blob); a.download = name;
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
+
+// Save directly to a folder on disk (File System Access API: Chrome / Edge).
+const folderSupported = "showDirectoryPicker" in window;
+let dirHandle = null;
+if (!folderSupported) {
+  $("#folderBox").innerHTML = '<span class="hint">שמירה ישירה לתיקייה נתמכת רק ב-Chrome או Edge. כאן אפשר להוריד קבצים או ZIP.</span>';
+  $("#saveAll").hidden = true;
+} else {
+  $("#pickFolder").onclick = async () => {
+    try {
+      dirHandle = await window.showDirectoryPicker({id: "md-out", mode: "readwrite"});
+    } catch (e) {
+      if (e.name !== "AbortError") status.textContent = "שגיאה: " + e.message;
+      return;
+    }
+    $("#folderName").textContent = dirHandle.name;
+    $("#folderName").className = "path";
+    $("#pickFolder").textContent = "החלף תיקייה";
+    $("#autoSave").disabled = false;
+  };
+}
+
+async function ensureFolder() {
+  if (!dirHandle) await $("#pickFolder").onclick();
+  if (!dirHandle) return false;
+  const opts = {mode: "readwrite"};
+  if ((await dirHandle.queryPermission(opts)) === "granted") return true;
+  return (await dirHandle.requestPermission(opts)) === "granted";
+}
+
+async function exists(name) {
+  try { await dirHandle.getFileHandle(name); return true; } catch { return false; }
+}
+
+// Writes each result as <name>.md, adding " (1)", " (2)"... instead of overwriting.
+async function saveToFolder(items) {
+  if (!(await ensureFolder())) return 0;
+  let n = 0;
+  for (const r of items) {
+    const stem = r.name.replace(/\.md$/i, "");
+    let name = r.name, i = 1;
+    while (await exists(name)) name = `${stem} (${i++}).md`;
+    const fh = await dirHandle.getFileHandle(name, {create: true});
+    const w = await fh.createWritable();
+    await w.write(r.markdown);
+    await w.close();
+    r.savedAs = name;
+    if (r.badge) r.badge.textContent = `נשמר כ-${name}`;
+    n++;
+  }
+  return n;
+}
+
+$("#saveAll").onclick = async () => {
+  try {
+    const n = await saveToFolder(results.filter(r => !r.error));
+    if (n) status.textContent = `נשמרו ${n} קבצים לתיקייה ${dirHandle.name}`;
+  } catch (e) { status.textContent = "שגיאה בשמירה: " + e.message; }
+};
 
 $("#zipAll").onclick = async () => {
   const items = results.filter(r => !r.error).map(r => ({name: r.name, markdown: r.markdown}));
