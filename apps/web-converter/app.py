@@ -157,5 +157,10 @@ def make_pdf():
 
 
 if __name__ == "__main__":
-    # Bound to localhost only: the app reads arbitrary files/URLs you give it.
-    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", 5000)), debug=False)
+    # Localhost only by default: the app reads arbitrary files/URLs you give it.
+    # The Docker image sets HOST=0.0.0.0 (needed inside a container).
+    app.run(
+        host=os.environ.get("HOST", "127.0.0.1"),
+        port=int(os.environ.get("PORT", 5000)),
+        debug=False,
+    )

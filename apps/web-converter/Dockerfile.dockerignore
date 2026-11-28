@@ -1,0 +1,12 @@
+# Used instead of the root .dockerignore when building with
+#   docker build -f apps/web-converter/Dockerfile .
+# Send only what the image needs.
+*
+!packages/markitdown/
+!apps/web-converter/pyproject.toml
+!apps/web-converter/uv.lock
+!apps/web-converter/app.py
+!apps/web-converter/templates/
+**/__pycache__
+**/.venv
+packages/markitdown/tests/
